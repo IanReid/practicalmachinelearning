@@ -1,14 +1,14 @@
 ---
 title: "Classification of Barbell Lift Performance"
 author: "Ian Reid"
-date: "04/04/2021"
+date: "07/04/2021"
 output: html_document
 ---
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 ### Executive Summary
-The performance of human subjects lifting a barbell was classified as correct or exhibiting one of four common errors on the basis of accelerometer measurements. A random forest classifier trained on labelled data gave 100% accuracy on the training instances and 99.9% accuracy on instances that were not included in the training set.
+The performance of human subjects lifting a barbell was classified as correct or exhibiting one of four common errors on the basis of accelerometer measurements. A random forest classifier trained on labelled data gave 100% accuracy on the training instances and 99.8% accuracy on instances that were not included in the training set.
 
 ### Introduction
 This project aimed to build a predictor of the quality of exercise performance, expressed as a label "A", "B", "C", "D", or "E", from accelerometer measurements made during barbell lifts by human subjects. Training data came from a [published study](http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har) that examined the possibility of providing automatic feedback to inexperienced weightlifters about their form.
