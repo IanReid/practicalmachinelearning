@@ -1,30 +1,79 @@
 ---
-title: "Practical Machine Learning Course Project"
+title: "Classification of Barbell Lift Performance"
 author: "Ian Reid"
 date: "04/04/2021"
 output: html_document
 ---
-
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+### Executive Summary
+The performance of human subjects lifting a barbell was classified as correct or exhibiting one of four common errors on the basis of accelerometer measurements. A random forest classifier trained on labelled data gave 100% accuracy on the training instances and 99.9% accuracy on instances that were not included in the training set.
 
-## R Markdown
+### Introduction
+This project aimed to build a predictor of the quality of exercise performance, expressed as a label "A", "B", "C", "D", or "E", from accelerometer measurements made during barbell lifts by human subjects. Training data came from a [published study](http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har) that examined the possibility of providing automatic feedback to inexperienced weightlifters about their form.
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+### Data exploration and cleaning
+Labelled training data was provided in the file pml-training.csv. 
+```{r load_libraries, message=FALSE}
+library(caret); library(readr); library(dplyr)
+library(parallel); library(doParallel)
 ```
 
-## Including Plots
+```{r}
+input_data <- read.csv("~/coursera/PracticalMachineLearning/CourseProject/pml-training.csv")
+dim(input_data)
+```
+Importing this file with readr::read.csv gave a dataframe with 160 columns and 19,622 rows. Running summary on the dataframe showed that some columns had been read as character rather than numeric data. Inspection of these columns uncovered #DIV/0! errors and blanks. Some other columns contained NA entries. To avoid problems during model training and prediction I selected a subset of columns which contained a numeric value in every row--no NAs--and recorded the names of the selected columns for future use. The first four columns, which contained a sample identifier and timestamps, were dropped because they could impair generalizability of the classifier. User_name was added to the predictor column names in case differences between human subjects impacted the measurements. 
+```{r}
+complete <- function(c) {!any(is.na(c))}
+complete_numeric_cols <- input_data %>% select_if(is.numeric) %>% select_if(complete)
+complete_numeric_colnames <- names(complete_numeric_cols)
+predictor_colnames <- c("user_name",complete_numeric_colnames[-(1:4)])
+length(predictor_colnames)
+```
+After this data cleaning, 53 predictor columns remained.  
 
-You can also embed plots, for example:
+### Model selection and training
+The input_data data was split into training samples and testing samples reserved for estimating out-of-sample error.
+```{r}
+inTrain <- createDataPartition(input_data$classe, p=0.8, list=FALSE, times=1)
+training <- input_data[inTrain,]
+testing <- input_data[-inTrain,]
+x <- select(training,all_of(predictor_colnames))
+y <- training$classe
+```
+Because RandomForest models are reputed to make good classifiers, I tried method = "rf" first. Following the advice of Leonard Greski in the Discussion Forum, I set up caret::train to use parallel processing and 5-fold cross-validation.
 
-```{r pressure, echo=FALSE, message=FALSE, warning=FALSE}
-plot(pressure)
+```{r message=FALSE, cache=TRUE, eval=TRUE, warning=FALSE}
+cluster <- makeCluster(detectCores()-3)
+registerDoParallel(cluster)
+
+fitControl <- trainControl(method = "cv", number=5, allowParallel = TRUE)
+
+fit <- train(x, y, method="rf", trcontrol = fitControl)
+stopCluster(cluster)
+registerDoSEQ()
+```
+### Estimating in-sample and out-of-sample error
+``` {r}
+fit_pred <- fitted(fit)
+train_cM <- confusionMatrix(fit_pred,factor(y))
+train_cM$overall
+```
+The in-sample prediction accuracy is `r round(train_cM$overall["Accuracy"] * 100,1)`%.
+```{r}
+test_pred <- predict(fit,newdata = testing)
+test_cM <- confusionMatrix(test_pred, factor(testing$classe))
+test_cM$overall
+```
+The out-of-sample prediction accuracy is `r round(test_cM$overall["Accuracy"] * 100,1)`%. The accuracy of this RandomForest predictor is acceptable.
+
+### Validation
+To validate the classifier and produce answers for the quiz I predicted class labels for the data in pml-testing.csv.
+```{r}
+validation_data <- read.csv("~/coursera/PracticalMachineLearning/CourseProject/pml-testing.csv")
+quiz_answers <- predict(fit,newdata = validation_data)
+dump("quiz_answers", file = "~/coursera/PracticalMachineLearning/CourseProject/quiz_answers.txt")
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
